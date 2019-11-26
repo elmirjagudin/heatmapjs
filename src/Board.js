@@ -2,76 +2,70 @@ import React from 'react';
 import {fabric} from 'fabric';
 import './Board.css';
 
-function narrow(v)
+
+class Gradient
 {
-    const startColor = [0, 0, 0];
-    const middleColor = [255, 0, 0];
-    const xColor = [255, 165, 0];
-    const endColor = [255, 255, 255];
-
-    if (0 <= v && v < 0.33)
+    constructor(colorStops)
     {
-        const r = (v - 0) / 0.33;
-
-        return {start: startColor, end: middleColor, mix: r};
-    }
-    else if (0.33 <= v && v < 0.66)
-    {
-        const r = (v - 0.33) / 0.33;
-
-        return {start: middleColor, end: xColor, mix: r};
-
-    }
-    else
-    {
-        const r = (v - 0.66) / 0.33;
-        return {start: xColor, end: endColor, mix: r};
-    }
-}
-
-function getRegion(val)
-{
-    const colorStopRanges = [0, 0.33, 0.66, 1];
-    const colorStopColors = [
-        [0, 0, 0],
-        [255, 0, 0],
-        [255, 165, 0],
-        [255, 255, 255],
-    ];
-
-    for (var i = 0; i < colorStopRanges.length-1; i += 1)
-    {
-        const startRange = colorStopRanges[i];
-        const stopRange = colorStopRanges[i + 1];
-
-        if (startRange <= val && val <= stopRange)
+        /*
+         * arrange color stops as a:
+         *  - indexRanges: list of ranges, sorted in ascending order
+         *  - colors: the matching colors for the ranges
+         */
+        this.indexRanges = Object.keys(colorStops).map(parseFloat).sort();
+        this.colors = []
+        for (var i = 0; i < this.indexRanges.length; i += 1)
         {
-            const mix = (val - startRange) / (stopRange - startRange);
-            return {
-                from: colorStopColors[i],
-                to: colorStopColors[i+1],
-                mix: mix
-            };
+            const range = this.indexRanges[i];
+            this.colors.push(colorStops[range]);
         }
     }
 
-    throw `gradient index ${val} is outside of color stop ranges`;
-}
+    getRegion(val)
+    {
+        for (var i = 0; i < this.indexRanges.length-1; i += 1)
+        {
+            const startRange = this.indexRanges[i];
+            const stopRange = this.indexRanges[i + 1];
 
-function mixColors(startColor, endColor, mix)
-{
-    return [
-        startColor[0] * (1 - mix) + endColor[0] * mix,
-        startColor[1] * (1 - mix) + endColor[1] * mix,
-        startColor[2] * (1 - mix) + endColor[2] * mix,
-    ];
-}
+            if (startRange <= val && val <= stopRange)
+            {
+                const mix = (val - startRange) / (stopRange - startRange);
+                return {
+                    from: this.colors[i],
+                    to: this.colors[i+1],
+                    mix: mix
+                };
+            }
+        }
 
-function getColor(v)
-{
-    const grad = getRegion(v);
-    const resColor = mixColors(grad.from, grad.to, grad.mix);
-    return `rgb(${resColor[0]}, ${resColor[1]}, ${resColor[2]})`;
+        throw `gradient index ${val} is outside of color stop ranges`;
+    }
+
+    mixColors(fromColor, toColor, mix)
+    {
+        const from = fromColor.getSource();
+        const to = toColor.getSource();
+
+        /*
+         * perform naive mixing of the two colors,
+         * even if it not 100% correct, it's probably good enough
+         * for coloring the heat map
+         */
+
+        return [
+            from[0] * (1 - mix) + to[0] * mix,
+            from[1] * (1 - mix) + to[1] * mix,
+            from[2] * (1 - mix) + to[2] * mix,
+        ];
+    }
+
+    getColor(v)
+    {
+        const grad = this.getRegion(v);
+        const resColor = this.mixColors(grad.from, grad.to, grad.mix);
+        return `rgb(${resColor[0]}, ${resColor[1]}, ${resColor[2]})`;
+    }
 }
 
 class Board extends React.Component
@@ -79,27 +73,25 @@ class Board extends React.Component
     constructor()
     {
         super();
-        console.log("Construcror");
-    }
 
-    addImage(img)
-    {
-       img.scale(0.5);
-       img.set({left: 16, top: 16});
-       this.canvas.add(img);
+        this.gradient = new Gradient({
+                0: new fabric.Color("black"),
+                0.33: new fabric.Color("red"),
+                0.66: new fabric.Color("orange"),
+                1: new fabric.Color("blue")
+        });
     }
 
     componentDidMount()
     {
         const canvas = new fabric.Canvas('board');
 
-
         for (var x = 0; x < 500; x += 4)
         {
             const r = new fabric.Rect({
               left: 70 + x,
               top: 100,
-              fill: getColor(x/(500-4)),
+              fill: this.gradient.getColor(x/(500-4)),
               width: 4,
               height: 40,
               selectable: false,
@@ -111,7 +103,6 @@ class Board extends React.Component
         const gradRect = new fabric.Rect({
               left: 70,
               top: 150,
-              fill: 'green',
               width: 500,
               height: 40,
               selectable: false,
@@ -127,7 +118,6 @@ class Board extends React.Component
                 0.33: 'rgb(255, 0, 0)',
                 0.66: 'rgb(255, 165, 0)',
                 1: 'rgb(255, 255, 255)',
-
             }
           });
         canvas.add(gradRect);
