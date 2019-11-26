@@ -68,6 +68,76 @@ class Gradient
     }
 }
 
+const WIDTH = 18;
+const HEIGHT = 10;
+
+class Heatmap
+{
+    constructor(results, gradient)
+    {
+        this.gradient = gradient;
+        this.results = results;
+
+        const someResult = Object.keys(results)[0]
+        this.minVal = results[someResult];
+        this.maxVal = results[someResult];
+
+        for (let cell in results)
+        {
+            const cellResult = results[cell];
+            if (this.minVal > cellResult)
+            {
+                this.minVal = cellResult;
+            }
+            if (this.maxVal < cellResult)
+            {
+                this.maxVal = cellResult;
+            }
+        }
+
+        this.resultsRange = this.maxVal - this.minVal;
+
+        console.log(this);
+    }
+
+    getCellColor(cellNum)
+    {
+        if (!(cellNum in this.results))
+        {
+            return "pink";
+        }
+
+        const cellResult = this.results[cellNum];
+
+        const scaledResult = (cellResult - this.minVal) / this.resultsRange;
+
+        return this.gradient.getColor(scaledResult);
+    }
+
+    addToCanavas(canvas)
+    {
+        for (var x = 0; x < WIDTH; x += 1)
+        {
+            for (var y = 0; y < HEIGHT; y += 1)
+            {
+                const cellNum = x * HEIGHT + y;
+
+                const r = new fabric.Rect({
+                    left: 100 + x * 20,
+                    top: 200 + y * 20,
+                    fill: this.getCellColor(cellNum),
+                    width: 18,
+                    height: 18,
+                    selectable: false,
+                });
+
+            canvas.add(r);
+
+            }
+        }
+    }
+}
+
 class Board extends React.Component
 {
     constructor()
@@ -78,8 +148,13 @@ class Board extends React.Component
                 0: new fabric.Color("black"),
                 0.33: new fabric.Color("red"),
                 0.66: new fabric.Color("orange"),
-                1: new fabric.Color("blue")
+                1: new fabric.Color("white")
         });
+
+        this.heatmap = new Heatmap(
+            {"0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5,
+             "10": 20, "11": 22, "12": 23, "13": 20, "14": 4, "15": 5},
+            this.gradient);
     }
 
     componentDidMount()
@@ -121,6 +196,8 @@ class Board extends React.Component
             }
           });
         canvas.add(gradRect);
+
+        this.heatmap.addToCanavas(canvas);
     }
 
     render()
